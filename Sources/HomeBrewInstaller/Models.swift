@@ -25,4 +25,5 @@ enum InstallState: Equatable {
     case installed
     case working(String)
     case failed(String)
+    case permissionNeeded(String)
 }

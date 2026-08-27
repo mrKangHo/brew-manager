@@ -88,6 +88,9 @@ struct ContentView: View {
         .sheet(isPresented: $showInstallSheet) {
             InstallHomebrewView(brew: brew, isPresented: $showInstallSheet)
         }
+        .sheet(isPresented: $brew.showPermissionsGuide) {
+            PermissionsView(brew: brew, isPresented: $brew.showPermissionsGuide)
+        }
         .task {
             async let r = PopularityService.fetchRanks()
             async let c: Void = catalog.load()
@@ -95,6 +98,7 @@ struct ContentView: View {
             await c
             rebuildSortedLists()
             await brew.refreshStatus()
+            brew.maybeShowPermissionsGuide()
         }
         .onChange(of: selection) { visibleCount = Self.pageSize }
         .onChange(of: searchText) { visibleCount = Self.pageSize }
@@ -197,7 +201,8 @@ struct ContentView: View {
                                 onInstall: { Task { await brew.install(pkg) } },
                                 onUninstall: { Task { await brew.uninstall(pkg) } },
                                 onUpdate: { Task { await brew.update(pkg) } },
-                                onSelect: { navPath.append(pkg) }
+                                onSelect: { navPath.append(pkg) },
+                                onOpenPermissionSettings: { brew.openAppManagementSettings() }
                             )
                             .onAppear {
                                 guard pkg.id == pagedPackages.last?.id else { return }
@@ -230,6 +235,12 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
             }
             Spacer()
+            Button {
+                brew.presentPermissionsGuide()
+            } label: {
+                Image(systemName: "lock.shield")
+            }
+            .help(L("필요한 권한 안내"))
             Button {
                 Task { await brew.refreshStatus() }
             } label: {

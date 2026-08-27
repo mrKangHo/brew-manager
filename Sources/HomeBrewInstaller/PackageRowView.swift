@@ -11,6 +11,7 @@ struct PackageRowView: View {
     let onUninstall: () -> Void
     let onUpdate: () -> Void
     let onSelect: () -> Void
+    let onOpenPermissionSettings: () -> Void
 
     @State private var isHovering = false
 
@@ -96,6 +97,13 @@ struct PackageRowView: View {
         case .failed(let msg):
             HStack(spacing: 6) {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+                Button(L("재시도"), action: onInstall)
+            }
+            .help(msg)
+        case .permissionNeeded(let msg):
+            HStack(spacing: 6) {
+                Image(systemName: "lock.circle.fill").foregroundStyle(.orange)
+                Button(L("권한 설정 열기"), action: onOpenPermissionSettings)
                 Button(L("재시도"), action: onInstall)
             }
             .help(msg)

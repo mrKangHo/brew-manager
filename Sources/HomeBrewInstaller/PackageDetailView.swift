@@ -96,6 +96,14 @@ struct PackageDetailView: View {
             Button(L("재시도")) { Task { await brew.install(pkg) } }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+        case .permissionNeeded:
+            HStack(spacing: 8) {
+                Button(L("권한 설정 열기")) { brew.openAppManagementSettings() }
+                    .controlSize(.large)
+                Button(L("재시도")) { Task { await brew.install(pkg) } }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+            }
         }
     }
 

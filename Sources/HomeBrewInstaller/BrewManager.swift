@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 
 @MainActor
 final class BrewManager: ObservableObject {
@@ -13,8 +14,74 @@ final class BrewManager: ObservableObject {
     @Published var isInstallingBrew: Bool = false
     @Published var brewInstallLog: String = ""
     @Published var isUpdatingAll: Bool = false
+    @Published var showPermissionsGuide: Bool = false
+    /// macOS has no public API to preflight "App Management" or "Automation"
+    /// TCC status, so this isn't a live check — it's inferred: once a cask
+    /// install/uninstall/upgrade has actually succeeded, both permissions
+    /// must already be in working order (Homebrew would have hit a
+    /// permission error otherwise, surfaced separately via `.permissionNeeded`).
+    @Published var caskPermissionsConfirmed: Bool = UserDefaults.standard.bool(forKey: BrewManager.caskPermissionsConfirmedKey)
 
     static let candidatePaths = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+    private static let appManagementSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement")!
+    private static let automationSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
+    private static let permissionsGuideShownKey = "hasShownPermissionsGuide"
+    private static let caskPermissionsConfirmedKey = "hasConfirmedCaskPermissions"
+
+    /// Shown once ever, unless a successful cask operation has already
+    /// confirmed the permissions are working. Reachable again anytime via
+    /// `presentPermissionsGuide()`.
+    func maybeShowPermissionsGuide() {
+        guard isBrewInstalled, !caskPermissionsConfirmed,
+              !UserDefaults.standard.bool(forKey: Self.permissionsGuideShownKey) else { return }
+        showPermissionsGuide = true
+    }
+
+    func presentPermissionsGuide() {
+        showPermissionsGuide = true
+    }
+
+    func dismissPermissionsGuide() {
+        showPermissionsGuide = false
+        UserDefaults.standard.set(true, forKey: Self.permissionsGuideShownKey)
+    }
+
+    private func confirmCaskPermissionsIfNeeded(_ pkg: BrewPackage) {
+        guard pkg.kind == .cask, !caskPermissionsConfirmed else { return }
+        caskPermissionsConfirmed = true
+        UserDefaults.standard.set(true, forKey: Self.caskPermissionsConfirmedKey)
+    }
+
+    /// There's no API to read the actual toggle in System Settings, so if the
+    /// user already granted it there themselves, the only way to reflect that
+    /// here is to let them say so directly.
+    func confirmPermissionsManually() {
+        caskPermissionsConfirmed = true
+        UserDefaults.standard.set(true, forKey: Self.caskPermissionsConfirmedKey)
+    }
+
+    func openAppManagementSettings() {
+        NSWorkspace.shared.open(Self.appManagementSettingsURL)
+    }
+
+    func openAutomationSettings() {
+        NSWorkspace.shared.open(Self.automationSettingsURL)
+    }
+
+    private func isPermissionError(_ output: String) -> Bool {
+        let needles = [
+            "Operation not permitted", "not permitted to send Apple events",
+            "App Management", "Permission denied", "you don't have permission",
+        ]
+        return needles.contains { output.localizedCaseInsensitiveContains($0) }
+    }
+
+    private func isSudoPasswordNeeded(_ output: String) -> Bool {
+        let needles = [
+            "a password is required", "sudo: a terminal is required", "sudo: no tty present",
+        ]
+        return needles.contains { output.localizedCaseInsensitiveContains($0) }
+    }
 
     var brewExecutable: String? {
         for path in Self.candidatePaths where FileManager.default.fileExists(atPath: path) {
@@ -58,10 +125,16 @@ final class BrewManager: ObservableObject {
         var args = ["install"]
         if pkg.kind == .cask { args.append("--cask") }
         args.append(pkg.name)
-        let result = await run(brew, args)
+        var result = await run(brew, args)
+        if !result.success && isSudoPasswordNeeded(result.output) {
+            states[pkg.id] = .working(L("관리자 암호 필요..."))
+            result = await runElevated(brew, args)
+        }
         if result.success {
             states[pkg.id] = .installed
             if pkg.kind == .formula { installedFormulae.insert(pkg.name) } else { installedCasks.insert(pkg.name) }
+        } else if isPermissionError(result.output) {
+            states[pkg.id] = .permissionNeeded(result.output)
         } else {
             states[pkg.id] = .failed(result.output)
         }
@@ -73,10 +146,17 @@ final class BrewManager: ObservableObject {
         var args = ["uninstall"]
         if pkg.kind == .cask { args.append("--cask") }
         args.append(pkg.name)
-        let result = await run(brew, args)
+        var result = await run(brew, args)
+        if !result.success && isSudoPasswordNeeded(result.output) {
+            states[pkg.id] = .working(L("관리자 암호 필요..."))
+            result = await runElevated(brew, args)
+        }
         if result.success {
             states[pkg.id] = .notInstalled
             if pkg.kind == .formula { installedFormulae.remove(pkg.name) } else { installedCasks.remove(pkg.name) }
+            confirmCaskPermissionsIfNeeded(pkg)
+        } else if isPermissionError(result.output) {
+            states[pkg.id] = .permissionNeeded(result.output)
         } else {
             states[pkg.id] = .failed(result.output)
         }
@@ -88,10 +168,17 @@ final class BrewManager: ObservableObject {
         var args = ["upgrade"]
         if pkg.kind == .cask { args.append("--cask") }
         args.append(pkg.name)
-        let result = await run(brew, args)
+        var result = await run(brew, args)
+        if !result.success && isSudoPasswordNeeded(result.output) {
+            states[pkg.id] = .working(L("관리자 암호 필요..."))
+            result = await runElevated(brew, args)
+        }
         if result.success {
             states[pkg.id] = .installed
             if pkg.kind == .formula { outdatedFormulae.remove(pkg.name) } else { outdatedCasks.remove(pkg.name) }
+            confirmCaskPermissionsIfNeeded(pkg)
+        } else if isPermissionError(result.output) {
+            states[pkg.id] = .permissionNeeded(result.output)
         } else {
             states[pkg.id] = .failed(result.output)
         }
@@ -128,8 +215,38 @@ final class BrewManager: ObservableObject {
         await refreshStatus()
     }
 
+    /// Homebrew refuses to run as root, so instead of elevating the whole
+    /// `brew` process we hand it a GUI askpass helper. Homebrew's own
+    /// internal `sudo` calls (e.g. removing a cask's privileged helper
+    /// files) pick this up via the `SUDO_ASKPASS` env var and prompt for
+    /// the password through this dialog instead of failing on the missing tty.
+    private func makeAskpassScript() -> URL? {
+        let prompt = L("Homebrew 작업에 관리자 암호가 필요합니다.")
+        let appleScript = "display dialog \"\(prompt)\" default answer \"\" with hidden answer with icon caution"
+        let script = """
+        #!/bin/sh
+        osascript -e '\(appleScript)' -e 'text returned of result'
+        """
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("brewmanager-askpass-\(UUID().uuidString).sh")
+        do {
+            try script.write(to: url, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+            return url
+        } catch {
+            return nil
+        }
+    }
+
+    private func runElevated(_ path: String, _ args: [String]) async -> (output: String, success: Bool) {
+        guard let askpass = makeAskpassScript() else {
+            return (L("관리자 암호 입력창을 준비하지 못했습니다."), false)
+        }
+        defer { try? FileManager.default.removeItem(at: askpass) }
+        return await run(path, args, extraEnv: ["SUDO_ASKPASS": askpass.path])
+    }
+
     @discardableResult
-    private func run(_ path: String, _ args: [String]) async -> (output: String, success: Bool) {
+    private func run(_ path: String, _ args: [String], extraEnv: [String: String] = [:]) async -> (output: String, success: Bool) {
         await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: path)
@@ -137,6 +254,7 @@ final class BrewManager: ObservableObject {
 
             var env = ProcessInfo.processInfo.environment
             env["PATH"] = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:" + (env["PATH"] ?? "/usr/bin:/bin")
+            for (key, value) in extraEnv { env[key] = value }
             process.environment = env
 
             let pipe = Pipe()
