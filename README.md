@@ -30,6 +30,15 @@
 
 ## Install
 
+### Homebrew (recommended)
+
+```bash
+brew tap mrKangHo/brew-manager https://github.com/mrKangHo/brew-manager
+brew install --cask brew-manager
+```
+
+### Manual
+
 Download the latest build from the [Releases](../../releases) page, unzip it, and drag `Brew Manager.app` to `/Applications`.
 
 Since this build isn't notarized by Apple, macOS Gatekeeper will block it on first launch. To open it:

@@ -30,6 +30,15 @@
 
 ## 설치
 
+### Homebrew (권장)
+
+```bash
+brew tap mrKangHo/brew-manager https://github.com/mrKangHo/brew-manager
+brew install --cask brew-manager
+```
+
+### 수동 설치
+
 [Releases](../../releases) 페이지에서 최신 빌드를 받아 압축을 풀고 `Brew Manager.app`을 `/Applications`로 옮기세요.
 
 Apple 공증(notarization)을 받지 않은 빌드라 첫 실행 시 macOS Gatekeeper가 막습니다. 다음 중 하나로 여세요:

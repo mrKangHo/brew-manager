@@ -30,6 +30,15 @@
 
 ## 安装
 
+### Homebrew(推荐)
+
+```bash
+brew tap mrKangHo/brew-manager https://github.com/mrKangHo/brew-manager
+brew install --cask brew-manager
+```
+
+### 手动安装
+
 从 [Releases](../../releases) 页面下载最新版本，解压后将 `Brew Manager.app` 拖入 `/Applications`。
 
 由于该构建未经 Apple 公证(notarization)，首次启动时会被 macOS Gatekeeper 拦截。可通过以下方式打开:
