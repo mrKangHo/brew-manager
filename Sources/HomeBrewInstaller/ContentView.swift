@@ -104,29 +104,43 @@ struct ContentView: View {
         .onChange(of: searchText) { visibleCount = Self.pageSize }
     }
 
-    private var sidebar: some View {
+    @State private var isRefreshing = false
+
+    var sidebar: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
                 TextField(L("검색"), text: $searchText)
                     .textFieldStyle(.plain)
+                    .font(.system(size: 13))
                     .submitLabel(.search)
                 if !searchText.isEmpty {
                     Button {
-                        searchText = ""
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            searchText = ""
+                        }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
             .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+            )
             .padding(.horizontal, 10)
             .padding(.top, 8)
-            .padding(.bottom, 4)
+            .padding(.bottom, 6)
 
             List(SidebarSection.allCases, selection: $selection) { section in
                 Label(section.displayName, systemImage: section.systemImage)
@@ -136,7 +150,7 @@ struct ContentView: View {
             .listStyle(.sidebar)
         }
         .navigationTitle("Homebrew")
-        .navigationSplitViewColumnWidth(200)
+        .navigationSplitViewColumnWidth(210)
     }
 
     private var detail: some View {
@@ -147,17 +161,30 @@ struct ContentView: View {
 
                 if catalog.isLoading && basePackages.isEmpty {
                     Spacer()
-                    ProgressView(L("Homebrew 전체 목록 불러오는 중...\n(최초 1회, 잠시 걸릴 수 있어요)"))
-                        .multilineTextAlignment(.center)
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text(L("Homebrew 전체 목록 불러오는 중...\n(최초 1회, 잠시 걸릴 수 있어요)"))
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                     Spacer()
                 } else if let error = catalog.loadError, basePackages.isEmpty {
                     Spacer()
-                    Text(error).foregroundStyle(.secondary)
+                    VStack(spacing: 8) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.secondary)
+                        Text(error)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
                 } else {
                     HStack {
                         Text(LF("총 %d개 중 %d개 표시", basePackages.count, pagedPackages.count))
-                            .font(.caption)
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                         Spacer()
                         if selection == .installed && brew.outdatedCount > 0 {
@@ -171,19 +198,22 @@ struct ContentView: View {
                                 }
                             }
                             .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
                             .disabled(brew.isUpdatingAll)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 4)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.4))
 
                     if filteredPackages.isEmpty {
                         Spacer()
-                        VStack(spacing: 8) {
+                        VStack(spacing: 12) {
                             Image(systemName: searchText.isEmpty ? "tray" : "magnifyingglass")
-                                .font(.system(size: 32))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 36, weight: .light))
+                                .foregroundStyle(.tertiary)
                             Text(searchText.isEmpty ? L("표시할 항목이 없습니다") : LF("\"%@\" 검색 결과가 없습니다", searchText))
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -219,32 +249,71 @@ struct ContentView: View {
     }
 
     private var statusBar: some View {
-        HStack {
+        HStack(spacing: 12) {
             if brew.isBrewInstalled {
-                Label(brew.brewVersion.isEmpty ? L("Homebrew 설치됨") : brew.brewVersion, systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 7, height: 7)
+                    Text(brew.brewVersion.isEmpty ? L("Homebrew 설치됨") : brew.brewVersion)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.primary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.green.opacity(0.1), in: Capsule())
             } else {
-                Label(L("Homebrew 미설치"), systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 7, height: 7)
+                    Text(L("Homebrew 미설치"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.orange)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.1), in: Capsule())
+
                 Button(L("Homebrew 설치")) {
                     showInstallSheet = true
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
+            
             Spacer()
+            
             Button {
                 brew.presentPermissionsGuide()
             } label: {
                 Image(systemName: "lock.shield")
+                    .font(.system(size: 13))
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
             .help(L("필요한 권한 안내"))
+
             Button {
-                Task { await brew.refreshStatus() }
+                withAnimation(.linear(duration: 0.8)) {
+                    isRefreshing = true
+                }
+                Task {
+                    await brew.refreshStatus()
+                    withAnimation {
+                        isRefreshing = false
+                    }
+                }
             } label: {
                 Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 13))
+                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
             .help(L("상태 새로고침"))
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 }

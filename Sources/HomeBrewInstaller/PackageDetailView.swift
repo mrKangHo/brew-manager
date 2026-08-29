@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct PackageDetailView: View {
     let pkg: BrewPackage
@@ -9,37 +10,80 @@ struct PackageDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 20) {
                 header
+                
                 Divider()
 
                 if !pkg.desc.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(L("설명")).font(.headline)
-                        Text(pkg.desc).font(.body)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(L("설명"))
+                            .font(.system(size: 14, weight: .bold))
+                        Text(pkg.desc)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary.opacity(0.9))
+                            .lineSpacing(3)
                     }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                    )
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(L("정보")).font(.headline)
-                    LabeledContent(L("이름"), value: pkg.name)
-                    LabeledContent(L("종류"), value: pkg.kind.rawValue)
-                    if let rank {
-                        LabeledContent(L("인기 순위"), value: "#\(rank)")
-                    }
-                    if let homepage = pkg.homepage, let url = URL(string: homepage) {
-                        LabeledContent(L("웹사이트")) {
-                            Button {
-                                openURL(url)
-                            } label: {
-                                Text(homepage)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(L("정보"))
+                        .font(.system(size: 14, weight: .bold))
+                    
+                    VStack(spacing: 8) {
+                        LabeledContent(L("이름")) {
+                            Text(pkg.name).font(.system(size: 13, design: .monospaced))
+                        }
+                        Divider()
+                        LabeledContent(L("종류")) {
+                            Text(pkg.kind.rawValue).font(.system(size: 13))
+                        }
+                        if let rank {
+                            Divider()
+                            LabeledContent(L("인기 순위")) {
+                                Text("#\(rank)")
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(.blue)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue.opacity(0.1), in: Capsule())
                             }
-                            .buttonStyle(.link)
+                        }
+                        if let homepage = pkg.homepage, let url = URL(string: homepage) {
+                            Divider()
+                            LabeledContent(L("웹사이트")) {
+                                Button {
+                                    openURL(url)
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text(homepage)
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
+                                        Image(systemName: "arrow.up.right")
+                                            .font(.system(size: 10, weight: .bold))
+                                    }
+                                }
+                                .buttonStyle(.link)
+                            }
                         }
                     }
                 }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                )
 
                 Spacer(minLength: 0)
             }
@@ -50,14 +94,32 @@ struct PackageDetailView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .center, spacing: 20) {
             iconView
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(width: 72, height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(pkg.displayName).font(.largeTitle.bold())
-                Text(pkg.kind.rawValue).font(.subheadline).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Text(pkg.displayName)
+                        .font(.system(size: 24, weight: .bold))
+                    
+                    Text(pkg.kind == .formula ? "Formula" : "Cask")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.primary.opacity(0.06), in: Capsule())
+                }
+                
+                Text(pkg.name)
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -82,15 +144,17 @@ struct PackageDetailView: View {
                         .controlSize(.large)
                 } else {
                     Label(L("설치됨"), systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.green)
                 }
                 Button(L("삭제"), role: .destructive) { Task { await brew.uninstall(pkg) } }
+                    .buttonStyle(.bordered)
                     .controlSize(.large)
             }
         case .working(let msg):
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text(msg).foregroundStyle(.secondary)
+                Text(msg).font(.system(size: 13)).foregroundStyle(.secondary)
             }
         case .failed:
             Button(L("재시도")) { Task { await brew.install(pkg) } }
@@ -99,6 +163,7 @@ struct PackageDetailView: View {
         case .permissionNeeded:
             HStack(spacing: 8) {
                 Button(L("권한 설정 열기")) { brew.openAppManagementSettings() }
+                    .buttonStyle(.bordered)
                     .controlSize(.large)
                 Button(L("재시도")) { Task { await brew.install(pkg) } }
                     .buttonStyle(.borderedProminent)
@@ -125,8 +190,12 @@ struct PackageDetailView: View {
     }
 
     private var fallbackIcon: some View {
-        Image(systemName: pkg.kind == .formula ? "terminal" : "app.badge")
-            .font(.system(size: 36))
-            .foregroundStyle(.secondary)
+        ZStack {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+            Image(systemName: pkg.kind == .formula ? "terminal" : "app.badge")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
     }
 }
