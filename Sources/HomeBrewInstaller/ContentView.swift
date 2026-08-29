@@ -24,7 +24,6 @@ struct ContentView: View {
     @StateObject private var brew = BrewManager()
     @StateObject private var catalog = CatalogStore()
     @State private var selection: SidebarSection = .all
-    @State private var searchDraft = ""
     @State private var searchText = ""
     @State private var ranks: [String: Int] = [:]
     @State private var showInstallSheet = false
@@ -52,11 +51,12 @@ struct ContentView: View {
     }
 
     var filteredPackages: [BrewPackage] {
-        guard !searchText.isEmpty else { return basePackages }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return basePackages }
         return basePackages.filter {
-            $0.displayName.localizedCaseInsensitiveContains(searchText) ||
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            $0.desc.localizedCaseInsensitiveContains(searchText)
+            $0.displayName.localizedCaseInsensitiveContains(query) ||
+            $0.name.localizedCaseInsensitiveContains(query) ||
+            $0.desc.localizedCaseInsensitiveContains(query)
         }
     }
 
@@ -108,14 +108,11 @@ struct ContentView: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField(L("검색"), text: $searchDraft)
+                TextField(L("검색"), text: $searchText)
                     .textFieldStyle(.plain)
-                    .onSubmit {
-                        searchText = searchDraft
-                    }
-                if !searchDraft.isEmpty {
+                    .submitLabel(.search)
+                if !searchText.isEmpty {
                     Button {
-                        searchDraft = ""
                         searchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
