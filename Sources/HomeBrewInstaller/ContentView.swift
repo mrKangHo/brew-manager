@@ -20,27 +20,85 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+enum SidebarItem: Hashable, Identifiable {
+    case section(SidebarSection)
+    case category(PackageCategory)
+
+    var id: String {
+        switch self {
+        case .section(let s): return "section-\(s.rawValue)"
+        case .category(let c): return "category-\(c.rawValue)"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .section(let s): return s.displayName
+        case .category(let c): return c.displayName
+        }
+    }
+}
+
+enum ViewMode: String, CaseIterable, Identifiable {
+    case grid
+    case list
+
+    var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .grid: return "square.grid.2x2.fill"
+        case .list: return "list.bullet"
+        }
+    }
+}
+
+enum SortOption: String, CaseIterable, Identifiable {
+    case rank = "인기순"
+    case name = "이름순"
+
+    var id: String { rawValue }
+    var displayName: String { L(rawValue) }
+}
+
 struct ContentView: View {
     @StateObject private var brew = BrewManager()
     @StateObject private var catalog = CatalogStore()
-    @State private var selection: SidebarSection = .all
+    @State private var selection: SidebarItem = .section(.all)
     @State private var searchText = ""
+    @State private var viewMode: ViewMode = .grid
+    @State private var sortOption: SortOption = .rank
     @State private var ranks: [String: Int] = [:]
     @State private var showInstallSheet = false
     @State private var visibleCount = pageSize
     @State private var sortedFormulae: [BrewPackage] = []
     @State private var sortedCasks: [BrewPackage] = []
     @State private var sortedAll: [BrewPackage] = []
+    @State private var categoryCounts: [PackageCategory: Int] = [:]
     @State private var navPath: [BrewPackage] = []
 
     static let pageSize = 30
 
     var basePackages: [BrewPackage] {
         switch selection {
-        case .all: return sortedAll
-        case .formula: return sortedFormulae
-        case .cask: return sortedCasks
-        case .installed: return installedPackages
+        case .section(let s):
+            switch s {
+            case .all: return sortedAll
+            case .formula: return sortedFormulae
+            case .cask: return sortedCasks
+            case .installed: return installedPackages
+            }
+        case .category(let c):
+            return sortedAll.filter { PackageCategory.categorize($0) == c }
+        }
+    }
+
+    var sortedBasePackages: [BrewPackage] {
+        switch sortOption {
+        case .rank:
+            return basePackages
+        case .name:
+            return basePackages.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
         }
     }
 
@@ -52,8 +110,8 @@ struct ContentView: View {
 
     var filteredPackages: [BrewPackage] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return basePackages }
-        return basePackages.filter {
+        guard !query.isEmpty else { return sortedBasePackages }
+        return sortedBasePackages.filter {
             $0.displayName.localizedCaseInsensitiveContains(query) ||
             $0.name.localizedCaseInsensitiveContains(query) ||
             $0.desc.localizedCaseInsensitiveContains(query)
@@ -73,6 +131,16 @@ struct ContentView: View {
         sortedFormulae = Self.sortByRank(catalog.formulae, ranks: ranks)
         sortedCasks = Self.sortByRank(catalog.casks, ranks: ranks)
         sortedAll = Self.sortByRank(catalog.formulae + catalog.casks, ranks: ranks)
+        rebuildCategoryCounts()
+    }
+
+    private func rebuildCategoryCounts() {
+        var counts: [PackageCategory: Int] = [:]
+        for pkg in sortedAll {
+            let cat = PackageCategory.categorize(pkg)
+            counts[cat, default: 0] += 1
+        }
+        categoryCounts = counts
     }
 
     var pagedPackages: [BrewPackage] {
@@ -142,10 +210,27 @@ struct ContentView: View {
             .padding(.top, 8)
             .padding(.bottom, 6)
 
-            List(SidebarSection.allCases, selection: $selection) { section in
-                Label(section.displayName, systemImage: section.systemImage)
-                    .badge(section == .installed ? brew.outdatedCount : 0)
-                    .tag(section)
+            List(selection: $selection) {
+                Section {
+                    ForEach(SidebarSection.allCases) { section in
+                        Label(section.displayName, systemImage: section.systemImage)
+                            .badge(section == .installed ? brew.outdatedCount : 0)
+                            .tag(SidebarItem.section(section))
+                    }
+                }
+
+                Section(header: Text(L("카테고리")).font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)) {
+                    ForEach(PackageCategory.allCases) { category in
+                        Label {
+                            Text(category.displayName)
+                        } icon: {
+                            Image(systemName: category.systemImage)
+                                .foregroundStyle(category.accentColor)
+                        }
+                        .badge(categoryCounts[category] ?? 0)
+                        .tag(SidebarItem.category(category))
+                    }
+                }
             }
             .listStyle(.sidebar)
         }
@@ -182,12 +267,14 @@ struct ContentView: View {
                     }
                     Spacer()
                 } else {
-                    HStack {
+                    HStack(spacing: 12) {
                         Text(LF("총 %d개 중 %d개 표시", basePackages.count, pagedPackages.count))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
+
                         Spacer()
-                        if selection == .installed && brew.outdatedCount > 0 {
+
+                        if case .section(let s) = selection, s == .installed && brew.outdatedCount > 0 {
                             Button {
                                 Task { await brew.updateAll() }
                             } label: {
@@ -200,6 +287,34 @@ struct ContentView: View {
                             .buttonStyle(.borderedProminent)
                             .controlSize(.small)
                             .disabled(brew.isUpdatingAll)
+                        }
+
+                        HStack(spacing: 6) {
+                            Text(L("정렬"))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Picker("", selection: $sortOption) {
+                                ForEach(SortOption.allCases) { option in
+                                    Text(option.displayName).tag(option)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 110)
+                        }
+
+                        HStack(spacing: 6) {
+                            Text(L("보기"))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Picker("", selection: $viewMode) {
+                                ForEach(ViewMode.allCases) { mode in
+                                    Image(systemName: mode.systemImage).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 66)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -217,6 +332,39 @@ struct ContentView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                    } else if viewMode == .grid {
+                        ScrollView {
+                            VStack(spacing: 16) {
+                                if searchText.isEmpty {
+                                    FeaturedShelfView(packages: sortedAll, ranks: ranks, brew: brew) { pkg in
+                                        navPath.append(pkg)
+                                    }
+                                }
+
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240, maximum: 300), spacing: 14)], spacing: 14) {
+                                    ForEach(pagedPackages) { pkg in
+                                        PackageCardView(
+                                            pkg: pkg,
+                                            rank: ranks[pkg.name],
+                                            state: brew.state(for: pkg),
+                                            brewInstalled: brew.isBrewInstalled,
+                                            isOutdated: brew.isOutdated(pkg),
+                                            onInstall: { Task { await brew.install(pkg) } },
+                                            onUninstall: { Task { await brew.uninstall(pkg) } },
+                                            onUpdate: { Task { await brew.update(pkg) } },
+                                            onSelect: { navPath.append(pkg) },
+                                            onOpenPermissionSettings: { brew.openAppManagementSettings() }
+                                        )
+                                        .onAppear {
+                                            guard pkg.id == pagedPackages.last?.id else { return }
+                                            guard visibleCount < filteredPackages.count else { return }
+                                            visibleCount += Self.pageSize
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(16)
+                        }
                     } else {
                         List(pagedPackages) { pkg in
                             PackageRowView(

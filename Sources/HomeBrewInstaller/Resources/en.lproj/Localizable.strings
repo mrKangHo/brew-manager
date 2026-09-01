@@ -45,3 +45,23 @@
 "실행 중인 앱을 업데이트하거나 삭제하려면 다른 앱을 제어할 수 있는 권한이 필요합니다." = "Updating or removing a running app requires permission to control other apps.";
 "자동화" = "Automation";
 "일부 앱은 종료를 위해 다른 앱에 이벤트를 보내야 합니다. macOS가 대상 앱마다 개별적으로 허용을 물어봅니다." = "Some apps need to send events to other apps to quit them. macOS asks for approval separately for each target app.";
+"카테고리" = "Categories";
+"개발자 도구" = "Developer Tools";
+"생산성" = "Productivity";
+"유틸리티" = "Utilities";
+"디자인 & 크리에이티브" = "Design & Creative";
+"소통 & 메신저" = "Communication & Social";
+"미디어 & 엔터테인먼트" = "Media & Entertainment";
+"브라우저 & 웹" = "Browser & Web";
+"보안 & 네트워크" = "Security & Network";
+"AI & 데이터" = "AI & Data";
+"기타" = "Other";
+"추천 앱 및 툴" = "Featured Apps & Tools";
+"그리드" = "Grid";
+"리스트" = "List";
+"정렬" = "Sort";
+"인기순" = "Popularity";
+"이름순" = "Name";
+"설명 없음" = "No description provided";
+
+

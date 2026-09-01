@@ -46,6 +46,15 @@ struct PackageDetailView: View {
                         LabeledContent(L("종류")) {
                             Text(pkg.kind.rawValue).font(.system(size: 13))
                         }
+                        Divider()
+                        LabeledContent(L("카테고리")) {
+                            HStack(spacing: 4) {
+                                Image(systemName: PackageCategory.categorize(pkg).systemImage)
+                                    .font(.system(size: 11))
+                                Text(PackageCategory.categorize(pkg).displayName)
+                                    .font(.system(size: 13, weight: .medium))
+                            }
+                        }
                         if let rank {
                             Divider()
                             LabeledContent(L("인기 순위")) {
