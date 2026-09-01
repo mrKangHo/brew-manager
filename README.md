@@ -21,11 +21,13 @@
 
 ## Features
 
+- **App Store Style GUI**: Grid & List layout switcher with featured app shelf and category browsing
+- **10 Intelligent Categories**: Developer Tools, Productivity, Utilities, Design, Communication, Media, Browsers, Security, AI & Data, and Other
 - Detects whether Homebrew is installed, and installs it for you (one click, official script) if it isn't
 - Browses the **entire** Homebrew catalog (8,500+ formulae, 7,700+ casks) ranked by real install-popularity data from formulae.brew.sh
-- Formulae / Casks / Installed tabs, plus search (press Enter to search)
+- Real-time instant search with Enter submit support
 - One-click install, uninstall, and update, with an "Update All" button for outdated packages
-- Click any package to view a detail page with description, homepage link, and install status
+- Click any package to view a detail page with description, homepage link, category badge, and install status
 - Fully localized: **Korean, English, Japanese, Simplified Chinese** (follows your macOS system language)
 
 ## Install
