@@ -2,8 +2,6 @@ import SwiftUI
 
 enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case all = "전체"
-    case formula = "Formulae"
-    case cask = "Apps (Cask)"
     case installed = "설치됨"
     case updates = "업데이트"
 
@@ -14,13 +12,12 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     var systemImage: String {
         switch self {
         case .all: return "square.grid.2x2"
-        case .formula: return "terminal"
-        case .cask: return "app.badge"
         case .installed: return "checkmark.circle"
         case .updates: return "arrow.clockwise.circle"
         }
     }
 }
+
 
 
 enum SidebarItem: Hashable, Identifiable {
@@ -74,10 +71,9 @@ struct ContentView: View {
     @State private var ranks: [String: Int] = [:]
     @State private var showInstallSheet = false
     @State private var visibleCount = pageSize
-    @State private var sortedFormulae: [BrewPackage] = []
-    @State private var sortedCasks: [BrewPackage] = []
     @State private var sortedAll: [BrewPackage] = []
     @State private var categoryCounts: [PackageCategory: Int] = [:]
+    @State private var categoryPackages: [PackageCategory: [BrewPackage]] = [:]
     @State private var navPath: [BrewPackage] = []
 
     static let pageSize = 30
@@ -87,15 +83,15 @@ struct ContentView: View {
         case .section(let s):
             switch s {
             case .all: return sortedAll
-            case .formula: return sortedFormulae
-            case .cask: return sortedCasks
             case .installed: return installedPackages
             case .updates: return outdatedPackages
             }
         case .category(let c):
-            return sortedAll.filter { PackageCategory.categorize($0) == c }
+            return categoryPackages[c] ?? []
         }
     }
+
+
 
     var sortedBasePackages: [BrewPackage] {
         switch sortOption {
@@ -156,20 +152,23 @@ struct ContentView: View {
     }
 
     private func rebuildSortedLists() {
-        sortedFormulae = Self.sortByRank(catalog.formulae, ranks: ranks)
-        sortedCasks = Self.sortByRank(catalog.casks, ranks: ranks)
         sortedAll = Self.sortByRank(catalog.formulae + catalog.casks, ranks: ranks)
-        rebuildCategoryCounts()
+        rebuildCategoryData()
     }
 
-    private func rebuildCategoryCounts() {
+
+    private func rebuildCategoryData() {
+        var catMap: [PackageCategory: [BrewPackage]] = [:]
         var counts: [PackageCategory: Int] = [:]
         for pkg in sortedAll {
             let cat = PackageCategory.categorize(pkg)
+            catMap[cat, default: []].append(pkg)
             counts[cat, default: 0] += 1
         }
+        categoryPackages = catMap
         categoryCounts = counts
     }
+
 
     var pagedPackages: [BrewPackage] {
         Array(filteredPackages.prefix(visibleCount))
@@ -365,11 +364,12 @@ struct ContentView: View {
                     } else if viewMode == .grid {
                         ScrollView {
                             VStack(spacing: 16) {
-                                if searchText.isEmpty {
+                                if searchText.isEmpty && selection == .section(.all) {
                                     FeaturedShelfView(packages: sortedAll, ranks: ranks, brew: brew) { pkg in
                                         navPath.append(pkg)
                                     }
                                 }
+
 
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 240, maximum: 300), spacing: 14)], spacing: 14) {
                                     ForEach(pagedPackages) { pkg in
