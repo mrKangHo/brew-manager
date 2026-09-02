@@ -1,6 +1,8 @@
 cask "brew-manager" do
-  version "1.0.4"
-  sha256 "eba77534909c9831e7ff9e1c9ed3ca537adb2d609f7e7d9a23d27a39f5f33ad9"
+  version "1.0.5"
+  sha256 "e674be7bc83389e09b1803bf81b707c7fb9cf2fd4d2a753dc8f4fe088d50cd23"
+
+
 
   url "https://github.com/mrKangHo/brew-manager/releases/download/v#{version}/BrewManager-macOS-#{version}.zip"
   name "Brew Manager"

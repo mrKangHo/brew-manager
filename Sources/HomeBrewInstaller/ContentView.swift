@@ -5,6 +5,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case formula = "Formulae"
     case cask = "Apps (Cask)"
     case installed = "설치됨"
+    case updates = "업데이트"
 
     var id: String { rawValue }
 
@@ -16,9 +17,11 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .formula: return "terminal"
         case .cask: return "app.badge"
         case .installed: return "checkmark.circle"
+        case .updates: return "arrow.clockwise.circle"
         }
     }
 }
+
 
 enum SidebarItem: Hashable, Identifiable {
     case section(SidebarSection)
@@ -87,6 +90,7 @@ struct ContentView: View {
             case .formula: return sortedFormulae
             case .cask: return sortedCasks
             case .installed: return installedPackages
+            case .updates: return outdatedPackages
             }
         case .category(let c):
             return sortedAll.filter { PackageCategory.categorize($0) == c }
@@ -107,6 +111,30 @@ struct ContentView: View {
             pkg.kind == .formula ? brew.installedFormulae.contains(pkg.name) : brew.installedCasks.contains(pkg.name)
         }
     }
+
+    var outdatedPackages: [BrewPackage] {
+        installedPackages.filter { brew.isOutdated($0) }
+    }
+
+    private func badgeCount(for section: SidebarSection) -> Int {
+        switch section {
+        case .installed:
+            return installedPackages.count
+        case .updates:
+            return brew.outdatedCount
+        default:
+            return 0
+        }
+    }
+
+    var emptyStateText: String {
+        if case .section(let s) = selection, s == .updates {
+            return L("모든 패키지가 최신 버전입니다")
+        }
+        return L("표시할 항목이 없습니다")
+    }
+
+
 
     var filteredPackages: [BrewPackage] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -214,10 +242,11 @@ struct ContentView: View {
                 Section {
                     ForEach(SidebarSection.allCases) { section in
                         Label(section.displayName, systemImage: section.systemImage)
-                            .badge(section == .installed ? brew.outdatedCount : 0)
+                            .badge(badgeCount(for: section))
                             .tag(SidebarItem.section(section))
                     }
                 }
+
 
                 Section(header: Text(L("카테고리")).font(.system(size: 11, weight: .bold)).foregroundStyle(.secondary)) {
                     ForEach(PackageCategory.allCases) { category in
@@ -274,7 +303,7 @@ struct ContentView: View {
 
                         Spacer()
 
-                        if case .section(let s) = selection, s == .installed && brew.outdatedCount > 0 {
+                        if case .section(let s) = selection, s == .updates && brew.outdatedCount > 0 {
                             Button {
                                 Task { await brew.updateAll() }
                             } label: {
@@ -324,10 +353,11 @@ struct ContentView: View {
                     if filteredPackages.isEmpty {
                         Spacer()
                         VStack(spacing: 12) {
-                            Image(systemName: searchText.isEmpty ? "tray" : "magnifyingglass")
+                            Image(systemName: searchText.isEmpty ? (selection == .section(.updates) ? "checkmark.seal" : "tray") : "magnifyingglass")
                                 .font(.system(size: 36, weight: .light))
                                 .foregroundStyle(.tertiary)
-                            Text(searchText.isEmpty ? L("표시할 항목이 없습니다") : LF("\"%@\" 검색 결과가 없습니다", searchText))
+                            Text(searchText.isEmpty ? emptyStateText : LF("\"%@\" 검색 결과가 없습니다", searchText))
+
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
