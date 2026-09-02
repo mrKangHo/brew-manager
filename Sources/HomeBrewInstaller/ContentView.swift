@@ -66,6 +66,8 @@ struct ContentView: View {
     @StateObject private var catalog = CatalogStore()
     @State private var selection: SidebarItem = .section(.all)
     @State private var searchText = ""
+    @State private var appliedSearchText = ""
+
     @State private var viewMode: ViewMode = .grid
     @State private var sortOption: SortOption = .rank
     @State private var ranks: [String: Int] = [:]
@@ -133,7 +135,7 @@ struct ContentView: View {
 
 
     var filteredPackages: [BrewPackage] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = appliedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return sortedBasePackages }
         return sortedBasePackages.filter {
             $0.displayName.localizedCaseInsensitiveContains(query) ||
@@ -141,6 +143,7 @@ struct ContentView: View {
             $0.desc.localizedCaseInsensitiveContains(query)
         }
     }
+
 
     private static func sortByRank(_ list: [BrewPackage], ranks: [String: Int]) -> [BrewPackage] {
         list.sorted { lhs, rhs in
@@ -196,7 +199,7 @@ struct ContentView: View {
             brew.maybeShowPermissionsGuide()
         }
         .onChange(of: selection) { visibleCount = Self.pageSize }
-        .onChange(of: searchText) { visibleCount = Self.pageSize }
+        .onChange(of: appliedSearchText) { visibleCount = Self.pageSize }
     }
 
     @State private var isRefreshing = false
@@ -211,10 +214,14 @@ struct ContentView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .submitLabel(.search)
-                if !searchText.isEmpty {
+                    .onSubmit {
+                        appliedSearchText = searchText
+                    }
+                if !searchText.isEmpty || !appliedSearchText.isEmpty {
                     Button {
                         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                             searchText = ""
+                            appliedSearchText = ""
                         }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -225,6 +232,7 @@ struct ContentView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
+
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(Color(nsColor: .controlBackgroundColor))
@@ -352,11 +360,10 @@ struct ContentView: View {
                     if filteredPackages.isEmpty {
                         Spacer()
                         VStack(spacing: 12) {
-                            Image(systemName: searchText.isEmpty ? (selection == .section(.updates) ? "checkmark.seal" : "tray") : "magnifyingglass")
+                            Image(systemName: appliedSearchText.isEmpty ? (selection == .section(.updates) ? "checkmark.seal" : "tray") : "magnifyingglass")
                                 .font(.system(size: 36, weight: .light))
                                 .foregroundStyle(.tertiary)
-                            Text(searchText.isEmpty ? emptyStateText : LF("\"%@\" 검색 결과가 없습니다", searchText))
-
+                            Text(appliedSearchText.isEmpty ? emptyStateText : LF("\"%@\" 검색 결과가 없습니다", appliedSearchText))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
@@ -364,11 +371,12 @@ struct ContentView: View {
                     } else if viewMode == .grid {
                         ScrollView {
                             VStack(spacing: 16) {
-                                if searchText.isEmpty && selection == .section(.all) {
+                                if appliedSearchText.isEmpty && selection == .section(.all) {
                                     FeaturedShelfView(packages: sortedAll, ranks: ranks, brew: brew) { pkg in
                                         navPath.append(pkg)
                                     }
                                 }
+
 
 
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 240, maximum: 300), spacing: 14)], spacing: 14) {

@@ -1,6 +1,7 @@
 cask "brew-manager" do
-  version "1.0.6"
-  sha256 "e4ba89a1560378c27c272495994e9fd74d81db151063388c2d86181c2927ce0e"
+  version "1.0.7"
+  sha256 "8a9b5b9f5e61fe014791e844707180392fb8661c1fa5bdb26424a4a7a55e9251"
+
 
 
 
